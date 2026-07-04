@@ -57,7 +57,7 @@ Keputusan desain frontend + alasannya. Kode UI ditulis mengikuti dokumen ini
 
 | Route | Akses | Isi | Sumber data |
 |---|---|---|---|
-| `/` | publik | katalog lapangan (card: nama, harga/jam, tombol "Lihat jadwal") | `GET /api/fields` |
+| `/` | publik | hero animasi (§2b) + katalog lapangan (card: nama, harga/jam, tombol "Lihat jadwal") | db langsung (Server Component; keputusan 2026-07-04 — HTML jadi di server, tanpa loading flicker; `GET /api/fields` tetap dipakai halaman client) |
 | `/fields/[id]` | publik | pilih tanggal → grid slot jam 08–23 → form booking (jam mulai, durasi) | `GET /api/fields/[id]/availability?date=` |
 | `/login`, `/register` | publik | form auth | `POST /api/auth/*` |
 | `/bookings` | user | daftar booking milik sendiri + badge status + cancel (saat pending) | `GET /api/bookings` |

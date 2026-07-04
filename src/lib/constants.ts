@@ -7,3 +7,12 @@ export function todayWIB(): string {
     timeZone: "Asia/Jakarta",
   }).format(new Date());
 }
+export function nowHourWIB(): number {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      hour12: false,
+    }).format(new Date()),
+  );
+}

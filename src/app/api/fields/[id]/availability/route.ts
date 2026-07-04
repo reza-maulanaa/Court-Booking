@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { bookings, fields } from "@/db/schema";
 import { OPEN_HOUR, CLOSE_HOUR } from "@/lib/constants";
+import { todayWIB, nowHourWIB } from "@/lib/constants";
 
 const dateSchema = z.iso.date();
 
@@ -44,9 +45,11 @@ export async function GET(
     for (let h = b.startHour; h < b.startHour + b.durationHours; h++)
       taken.add(h);
 
+  const pastHour = date === todayWIB() ? nowHourWIB() : -1;
+
   const slots = [];
   for (let h = OPEN_HOUR; h < CLOSE_HOUR; h++)
-    slots.push({ hour: h, available: !taken.has(h) });
+    slots.push({ hour: h, available: !taken.has(h) && h > pastHour });
 
   return NextResponse.json({ fieldId: id, date, slots });
 }

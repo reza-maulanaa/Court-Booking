@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CLOSE_HOUR, MAX_DAYS_AHEAD, OPEN_HOUR, todayWIB } from "./constants";
+import { nowHourWIB } from "./constants";
 
 const emailSchema = z
   .string()
@@ -51,6 +52,9 @@ export const createBookingSchema = z
       message: `Tanggal harus hari ini s/d ${MAX_DAYS_AHEAD} hari ke depan`,
       path: ["bookingDate"],
     },
-  );
-
+  )
+  .refine((b) => b.bookingDate !== todayWIB() || b.startHour > nowHourWIB(), {
+    message: "Jam tersebut sudah lewat",
+    path: ["startHour"],
+  });
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
