@@ -36,7 +36,13 @@ Keputusan desain frontend + alasannya. Kode UI ditulis mengikuti dokumen ini
 - **Tidak dibuat**: dark mode. Alasan: nambah ±2× kerja styling tanpa
   nambah nilai demo MVP.
 
-## 2b. Hero section & animasi (keputusan 2026-07-04)
+## 2b. Hero section & animasi (keputusan 2026-07-04 — DIGANTIKAN §2c)
+
+> **2026-07-05**: hero SVG + GSAP diganti hero video (§2c). Poin "batas
+> pemakaian animasi" dan "prefers-reduced-motion" di bawah tetap berlaku
+> sebagai prinsip; implementasi hero-nya yang berubah. gsap sekarang tidak
+> dipakai siapa pun — boleh di-uninstall, atau disimpan untuk
+> micro-interaction nanti.
 
 - Halaman `/` dibuka **hero section** dengan **animasi lapangan futsal**
   (SVG lapangan: garis lapangan ter-gambar berurutan, bola bergerak,
@@ -53,11 +59,72 @@ Keputusan desain frontend + alasannya. Kode UI ditulis mengikuti dokumen ini
   acuan visual, implementasi tetap shadcn + Tailwind (bukan dependency
   baru).
 
+## 2c. Hero Video (keputusan 2026-07-05)
+
+Decision log — menggantikan hero SVG/GSAP §2b:
+
+- **Video sebagai background hero, bukan gambar statis.** Alasan: footage
+  lapangan asli menjual suasana lebih kuat daripada ilustrasi; untuk
+  portfolio, hero video juga mendemokan penanganan media + a11y.
+  File: `public/futsal.mp4` (1280×720, 10 detik, 2,6MB — ukuran kecil
+  disengaja agar layak `preload="auto"`; kalau ganti footage, jaga di
+  bawah ±5MB).
+- **Aspect ratio asli 16:9, ditampilkan `object-cover`.** Video mengisi
+  penuh kontainer di semua breakpoint; di mobile portrait sisi kiri-kanan
+  ter-crop. Alasan: crop lebih baik daripada gepeng (distorsi) atau
+  letterbox (bar hitam) — komposisi tengah frame tetap terlihat.
+- **Overlay gelap `bg-black/50`** (hitam 50%) solid di atas video.
+  Alasan: frame video berubah-ubah, kontras teks tidak bisa dijamin per
+  frame; 50% hitam membuat teks putih lolos WCAG 4.5:1 di frame seterang
+  apa pun. Solid dipilih atas gradient: lebih sederhana dan kontras
+  merata di semua posisi teks.
+- **Poster: `public/hero-poster.jpg`** (frame pertama video, via ffmpeg).
+  Dipakai dua lapis: atribut `poster` di `<video>` + `<img>` di belakang
+  video. Alasan: koneksi lambat langsung lihat gambar (bukan kotak
+  hitam), dan poster = frame pertama membuat transisi ke video mulus.
+- **`prefers-reduced-motion` dihormati via client component kecil**
+  (`hero-video.tsx`, `matchMedia` lewat `useSyncExternalStore`): kalau
+  user set reduce, elemen `<video>` TIDAK dirender sama sekali — bukan
+  sekadar disembunyikan CSS. Alasan: `display:none` tetap mengunduh
+  video (2,6MB sia-sia); tidak dirender = tidak diunduh, user dapat
+  poster statis. Konsekuensi sadar: video baru muncul setelah hydration
+  (celahnya ditutup poster).
+- **Tinggi hero `85svh`** (bukan `h-screen`/100vh). Alasan: (1) `svh`
+  menghitung viewport mobile dengan URL bar terlihat — `100vh` di mobile
+  Safari lebih tinggi dari layar dan bikin lompatan; (2) 85% menyisakan
+  intip-an katalog di bawah, isyarat bahwa halaman bisa di-scroll —
+  hero full-screen sering dikira "halamannya cuma ini".
+
+**Update 2026-07-05 (2) — scroll-scrubbing (keputusan bersama via opsi):**
+
+- **Video tidak autoplay lagi; progress video terikat scroll** (ala
+  landing Apple). Wrapper hero setinggi `300vh`, konten hero `sticky`
+  setinggi viewport; scroll 0→100% wrapper = video frame awal→akhir,
+  dua arah. Alasan: hero jadi interaktif dan memorable — nilai demo
+  portfolio — dan video 10 detik pas untuk ±2 viewport jarak scroll.
+- **File terpisah `public/futsal-scrub.mp4`** (4,7MB, H.264 openh264,
+  tanpa audio, keyframe tiap 4 frame / `-g 4`). Alasan: mp4 asli cuma
+  punya 1 keyframe per 10 detik — `currentTime` seeking harus decode
+  dari frame 0 setiap kali = scrub patah-patah. Keyframe rapat = seek
+  murah. Trade-off sadar: ukuran naik 2,6→4,7MB demi kehalusan scrub;
+  `preload="auto"` kini WAJIB (scrub butuh buffer penuh).
+- **Scrub via `requestAnimationFrame` + lerp tanpa library** (bukan GSAP
+  ScrollTrigger): logika inti cuma ±30 baris — progress dari
+  `getBoundingClientRect`, `currentTime` dikejar pelan (lerp 0.15) biar
+  halus. gsap resmi tidak dipakai lagi.
+- **`prefers-reduced-motion`**: wrapper kolaps ke `85svh` murni via CSS
+  (`motion-safe:` variant), video tetap tidak dirender/diunduh — user
+  reduce dapat hero statis normal tanpa pin-scroll.
+- **Polish halaman publik (scope keputusan bersama)**: navbar sticky +
+  backdrop-blur; katalog card hover lift + ikon lapangan; footer
+  sederhana; halaman field & auth dirapikan. Tetap dalam pagar §1–§2:
+  shadcn default, satu aksen hijau, tanpa dark mode.
+
 ## 3. Peta halaman
 
 | Route | Akses | Isi | Sumber data |
 |---|---|---|---|
-| `/` | publik | hero animasi (§2b) + katalog lapangan (card: nama, harga/jam, tombol "Lihat jadwal") | db langsung (Server Component; keputusan 2026-07-04 — HTML jadi di server, tanpa loading flicker; `GET /api/fields` tetap dipakai halaman client) |
+| `/` | publik | hero video (§2c) + katalog lapangan (card: nama, harga/jam, tombol "Lihat jadwal") | db langsung (Server Component; keputusan 2026-07-04 — HTML jadi di server, tanpa loading flicker; `GET /api/fields` tetap dipakai halaman client) |
 | `/fields/[id]` | publik | pilih tanggal → grid slot jam 08–23 → form booking (jam mulai, durasi) | `GET /api/fields/[id]/availability?date=` |
 | `/login`, `/register` | publik | form auth | `POST /api/auth/*` |
 | `/bookings` | user | daftar booking milik sendiri + badge status + cancel (saat pending) | `GET /api/bookings` |

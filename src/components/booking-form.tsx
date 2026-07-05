@@ -128,7 +128,7 @@ export function BookingForm({
                   key={slot.hour}
                   type="button"
                   variant={selected ? "default" : "outline"}
-                  className="h-12 text-base font-semibold"
+                  className="h-12 text-base font-semibold transition-all not-disabled:hover:border-primary/50 disabled:bg-muted disabled:opacity-40"
                   disabled={!slot.available}
                   aria-pressed={selected}
                   onClick={() => {
@@ -167,7 +167,7 @@ export function BookingForm({
         </div>
       )}
 
-      <div className="flex items-center justify-between rounded-xl border bg-muted/50 p-5">
+      <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-5">
         <div className="text-base">
           {startHour === null ? (
             <span className="text-muted-foreground">

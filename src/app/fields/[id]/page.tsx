@@ -20,16 +20,18 @@ export default async function FieldPage({
   if (!field) notFound();
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8">
-      <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">
-        {field.name}
-      </h1>
-      <p className="mb-8 text-base text-muted-foreground md:text-lg">
-        <span className="text-xl font-bold text-primary md:text-2xl">
-          {rupiah.format(field.hargaPerJam)}
-        </span>{" "}
-        / jam · buka 08.00–23.00
-      </p>
+    <div className="mx-auto w-full max-w-2xl px-4 py-8 md:py-12">
+      <div className="mb-8 rounded-2xl border bg-gradient-to-br from-primary/10 to-transparent p-6">
+        <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">
+          {field.name}
+        </h1>
+        <p className="mt-1 text-base text-muted-foreground md:text-lg">
+          <span className="text-xl font-bold text-primary md:text-2xl">
+            {rupiah.format(field.hargaPerJam)}
+          </span>{" "}
+          / jam · buka 08.00–23.00
+        </p>
+      </div>
       <BookingForm fieldId={field.id} hargaPerJam={field.hargaPerJam} />
     </div>
   );

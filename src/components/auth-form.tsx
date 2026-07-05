@@ -68,9 +68,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   }
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-sm shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl">{copy.title}</CardTitle>
+        <CardTitle className="text-2xl">{copy.title}</CardTitle>
         <CardDescription>{copy.description}</CardDescription>
       </CardHeader>
       <CardContent>

@@ -17,13 +17,13 @@ export async function Navbar() {
     : null;
 
   return (
-    <header className="border-b bg-background">
+    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
       <nav className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-2 px-4">
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2 text-lg font-bold text-primary"
+          className="flex shrink-0 items-center gap-2 text-xl font-extrabold tracking-tight text-primary md:text-2xl"
         >
-          <Goal className="size-6" aria-hidden />
+          <Goal className="size-7" aria-hidden />
           Booking Futsal
         </Link>
 
