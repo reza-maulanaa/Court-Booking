@@ -1,95 +1,110 @@
-import Image from "next/image";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { db } from "@/db";
-import { HeroSection } from "@/components/sections/hero-section";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import type { Metadata } from "next";
+import { Barlow, Barlow_Condensed } from "next/font/google";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { db, expireStaleBookings } from "@/db";
+import { bookings, users } from "@/db/schema";
+import { getSession } from "@/lib/auth";
+import { CLOSE_HOUR, OPEN_HOUR, nowHourWIB, todayWIB } from "@/lib/constants";
+import { LandingNav } from "@/components/sections/landing-nav";
+import { LandingHero } from "@/components/sections/landing-hero";
+import { BookingSection } from "@/components/sections/booking-section";
+import { FieldsSection } from "@/components/sections/fields-section";
+import { FacilitiesSection } from "@/components/sections/facilities-section";
+import { GallerySection } from "@/components/sections/gallery-section";
+import { TestimonialsSection } from "@/components/sections/testimonials-section";
+import { FaqSection } from "@/components/sections/faq-section";
+import { LocationSection } from "@/components/sections/location-section";
+import { LandingFooter } from "@/components/sections/landing-footer";
 
-const rupiah = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
-  maximumFractionDigits: 0,
+// Font landing (DESAIN §2d) — hanya halaman "/"; halaman lain tetap Geist.
+const barlow = Barlow({
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+  variable: "--font-barlow",
+});
+const barlowCondensed = Barlow_Condensed({
+  weight: ["700", "800"],
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  variable: "--font-barlow-condensed",
 });
 
-// ponytail: foto di-hardcode per nama — pindah ke kolom DB kalau lapangan
-// jadi dinamis/dikelola admin
-const fieldPhoto: Record<string, string> = {
-  "Lapangan A": "/fields/lapangan-a.jpg",
-  "Lapangan B": "/fields/lapangan-b.jpg",
+export const metadata: Metadata = {
+  title: "Tanjung Futsal — Booking lapangan, langsung main",
 };
+
+// Selalu render per-request: chip "slot kosong hari ini" dan sesi login
+// tidak boleh dibekukan saat build.
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const allFields = await db.query.fields.findMany({
     orderBy: (f, { asc }) => asc(f.name),
   });
 
-  return (
-    <>
-      <HeroSection />
+  const session = await getSession();
+  const user = session
+    ? await db.query.users.findFirst({
+        columns: { name: true },
+        where: eq(users.id, session.sub),
+      })
+    : null;
 
-      <section
-        id="katalog"
-        className="mx-auto w-full max-w-5xl scroll-mt-20 px-4 py-16 md:py-24"
-      >
-        <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
-          Katalog
-        </p>
-        <h2 className="text-3xl font-extrabold tracking-tight md:text-4xl">
-          Pilih Lapangan
-        </h2>
-        <p className="mt-2 mb-8 text-muted-foreground md:text-lg">
-          Lapangan indoor, harga per jam, jadwal real-time.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2 md:gap-6">
-          {allFields.map((field) => (
-            <Card
-              key={field.id}
-              className="group overflow-hidden pt-0 transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
-            >
-              <div className="relative aspect-video overflow-hidden">
-                <Image
-                  src={fieldPhoto[field.name] ?? "/hero-poster.jpg"}
-                  alt={`Foto ${field.name}`}
-                  fill
-                  sizes="(min-width: 640px) 50vw, 100vw"
-                  className="object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-              </div>
-              <CardHeader>
-                <CardTitle className="text-xl">{field.name}</CardTitle>
-                <CardDescription className="text-base">
-                  <span className="text-2xl font-bold text-primary">
-                    {rupiah.format(field.hargaPerJam)}
-                  </span>{" "}
-                  / jam
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  size="lg"
-                  className="w-full text-base font-semibold sm:w-auto"
-                  asChild
-                >
-                  <Link href={`/fields/${field.id}`}>
-                    Lihat jadwal
-                    <ArrowRight
-                      aria-hidden
-                      className="transition-transform group-hover:translate-x-0.5"
-                    />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-    </>
+  // Chip "N slot kosong" hari ini per lapangan — logika sama dengan
+  // availability API: jam operasional − booking aktif − jam yang sudah lewat.
+  await expireStaleBookings();
+  const today = todayWIB();
+  const nowHour = nowHourWIB();
+  const bookedToday = allFields.length
+    ? await db.query.bookings.findMany({
+        columns: { fieldId: true, startHour: true, durationHours: true },
+        where: and(
+          inArray(
+            bookings.fieldId,
+            allFields.map((f) => f.id),
+          ),
+          eq(bookings.bookingDate, today),
+          notInArray(bookings.status, ["cancelled", "expired"]),
+        ),
+      })
+    : [];
+  const freeToday = allFields.map((f) => {
+    const taken = new Set<number>();
+    for (const b of bookedToday)
+      if (b.fieldId === f.id)
+        for (let h = b.startHour; h < b.startHour + b.durationHours; h++)
+          taken.add(h);
+    let free = 0;
+    for (let h = OPEN_HOUR; h < CLOSE_HOUR; h++)
+      if (!taken.has(h) && h > nowHour) free++;
+    return free;
+  });
+
+  const fieldProps = allFields.map((f) => ({
+    id: f.id,
+    name: f.name,
+    hargaPerJam: f.hargaPerJam,
+  }));
+
+  return (
+    <div
+      className={`${barlow.variable} ${barlowCondensed.variable} font-barlow bg-white text-tf-ink`}
+    >
+      <LandingNav />
+      <LandingHero />
+      <BookingSection
+        fields={fieldProps}
+        freeToday={freeToday}
+        isLoggedIn={session !== null}
+        userName={user?.name ?? ""}
+      />
+      <FieldsSection fields={fieldProps} />
+      <FacilitiesSection />
+      <GallerySection />
+      <TestimonialsSection />
+      <FaqSection />
+      <LocationSection />
+      <LandingFooter />
+    </div>
   );
 }

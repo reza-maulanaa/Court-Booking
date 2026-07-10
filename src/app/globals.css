@@ -9,6 +9,8 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+  --font-barlow: var(--font-barlow);
+  --font-barlow-condensed: var(--font-barlow-condensed);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,6 +47,37 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Palet landing Tanjung Futsal (DESAIN §2d) — nilai persis dari prototipe
+   "Tanjung Futsal.html"; dipakai hanya di halaman "/". */
+@theme {
+  --color-tf-green: #0e7b45; /* aksen utama */
+  --color-tf-green-deep: #0a3b24; /* hover aksen */
+  --color-tf-lime: #c6e750; /* aksen sekunder */
+  --color-tf-lime-bright: #d6f266; /* hover lime */
+  --color-tf-ink: #12241a; /* teks gelap + basis border rgba */
+  --color-tf-forest: #08301d; /* background hero & testimoni */
+  --color-tf-forest-card: #0b4229; /* kartu testimoni */
+  --color-tf-mist: #f5f7f3; /* background section terang */
+  --color-tf-muted: #5a6b60; /* teks sekunder */
+  --color-tf-sage: #9fbca9; /* teks sekunder di background gelap */
+  --color-tf-cloud: #d7e4db; /* teks paragraf di background gelap */
+  --color-tf-pale: #eaf4ee; /* background pilihan aktif */
+  --color-tf-fog: #e4e8e2; /* slot terisi */
+  --color-tf-slot-muted: #a6b0a8; /* teks slot terisi */
+  --color-tf-disabled: #cbd4cd; /* tombol lanjut nonaktif */
+}
+
+/* Placeholder bergaris untuk slot foto asli (prototipe: repeating gradient) */
+@utility tf-stripes {
+  background: repeating-linear-gradient(
+    45deg,
+    #e9eee8,
+    #e9eee8 12px,
+    #f2f5f0 12px,
+    #f2f5f0 24px
+  );
 }
 
 :root {

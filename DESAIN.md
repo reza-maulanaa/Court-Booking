@@ -120,11 +120,43 @@ Decision log — menggantikan hero SVG/GSAP §2b:
   sederhana; halaman field & auth dirapikan. Tetap dalam pagar §1–§2:
   shadcn default, satu aksen hijau, tanpa dark mode.
 
+## 2d. Landing "Tanjung Futsal" (keputusan 2026-07-10 — menggantikan §2c untuk halaman `/`)
+
+Halaman `/` diganti total dengan landing page hasil prototipe
+"Tanjung Futsal.html" (fidelitas visual 1:1, keputusan user via opsi).
+Halaman lain tetap §2 (shadcn + Geist + navbar/footer lama).
+
+- **Identitas terpisah dari tema global**: font Barlow + Barlow Condensed
+  (next/font, di-load hanya di `/`), palet sendiri sebagai token `tf-*` di
+  `globals.css` (hijau `#0E7B45`, lime `#C6E750`, ink `#12241A`, hijau gelap
+  `#08301D`, bg section `#F5F7F3`). Alasan token (bukan hex tersebar):
+  satu sumber nilai, konsisten dengan pola `--primary` §2.
+- **Struktur**: route group — `/` berdiri sendiri dengan nav + footer
+  desain baru; halaman lama pindah ke `src/app/(app)/` yang me-render
+  Navbar + footer lama. Root layout tinggal html/body/Toaster.
+  Hero video §2c (hero-section/hero-video) dihapus — `/` tidak memakainya
+  lagi; file video di `public/` dibiarkan (aset, bukan kode).
+- **Booking 3 langkah di landing terhubung backend asli** (keputusan user:
+  integrasi penuh): daftar lapangan + harga dari DB, slot dari availability
+  API, "Konfirmasi Booking" → `POST /api/bookings`. Konsekuensi sadar:
+  (1) wajib login — belum login diarahkan ke `/login`;
+  (2) jam pilihan non-kontinu dipecah jadi beberapa booking (backend: satu
+  booking = satu rentang);
+  (3) pilihan metode pembayaran & field nama/WA/catatan hanya tampilan
+  (fidelitas prototipe) — backend memakai user JWT dan alur bukti transfer
+  §9 ARCHITECTURE, metode bayar memang tidak disimpan;
+  (4) "kode booking" = 4 karakter pertama id booking asli (`TF-XXXX`).
+- **Copywriting, harga (Rp 50.000/jam), dan jam operasional (08.00–23.00)
+  dari prototipe tidak diubah.** Placeholder bergaris = slot foto asli,
+  sengaja dibiarkan placeholder.
+- Prototipe didesain desktop 1280px; breakpoint mobile ditambahkan wajar
+  (grid kolaps, nav link tengah disembunyikan <768px) — prinsip §1 tetap.
+
 ## 3. Peta halaman
 
 | Route | Akses | Isi | Sumber data |
 |---|---|---|---|
-| `/` | publik | hero video (§2c) + katalog lapangan (card: nama, harga/jam, tombol "Lihat jadwal") | db langsung (Server Component; keputusan 2026-07-04 — HTML jadi di server, tanpa loading flicker; `GET /api/fields` tetap dipakai halaman client) |
+| `/` | publik | landing Tanjung Futsal (§2d): hero, booking 3 langkah, lapangan & harga, fasilitas, galeri, testimoni, FAQ, lokasi | db langsung (Server Component) + `GET /api/fields/[id]/availability` + `POST /api/bookings` |
 | `/fields/[id]` | publik | pilih tanggal → grid slot jam 08–23 → form booking (jam mulai, durasi) | `GET /api/fields/[id]/availability?date=` |
 | `/login`, `/register` | publik | form auth | `POST /api/auth/*` |
 | `/bookings` | user | daftar booking milik sendiri + badge status + cancel (saat pending) | `GET /api/bookings` |
