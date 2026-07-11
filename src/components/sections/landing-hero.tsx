@@ -11,7 +11,7 @@ export function LandingHero() {
     <div className="relative flex min-h-[88svh] items-center overflow-hidden bg-tf-forest md:min-h-0">
       <Image
         src="/court.jpg"
-        alt="Lapangan Tanjung Futsal"
+        alt="Lapangan Booking Futsal"
         fill
         priority
         sizes="100vw"

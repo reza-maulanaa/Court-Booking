@@ -10,7 +10,7 @@ export function LandingFooter() {
     <footer className="flex flex-col items-center justify-between gap-5 bg-tf-ink px-4 py-9 md:flex-row md:px-14">
       <div className="flex items-center">
         <span className="font-barlow-condensed text-lg font-extrabold uppercase text-white">
-          Tanjung Futsal
+          Booking Futsal
         </span>
       </div>
       <div className="flex gap-6 text-[13px] font-medium">
@@ -24,7 +24,7 @@ export function LandingFooter() {
           </a>
         ))}
       </div>
-      <div className="text-xs text-tf-muted">© 2026 Tanjung Futsal</div>
+      <div className="text-xs text-tf-muted">© 2026 Booking Futsal</div>
     </footer>
   );
 }

@@ -12,7 +12,7 @@ const PLACEHOLDERS = [
 export function GallerySection() {
   return (
     <div id="galeri" className="scroll-mt-16 bg-white px-4 py-12 md:px-14 md:py-16">
-      <SectionHeading kicker="Galeri" title="Suasana di Tanjung Futsal" />
+      <SectionHeading kicker="Galeri" title="Suasana di Booking Futsal" />
       <div className="grid auto-rows-[220px] gap-3.5 sm:grid-cols-2 md:grid-cols-3">
         <div className="relative overflow-hidden rounded-xl sm:col-span-2">
           <Image

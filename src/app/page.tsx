@@ -30,7 +30,7 @@ const barlowCondensed = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  title: "Tanjung Futsal — Booking lapangan, langsung main",
+  title: "Booking Futsal — Booking lapangan, langsung main",
 };
 
 // Selalu render per-request: chip "slot kosong hari ini" dan sesi login

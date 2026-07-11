@@ -276,7 +276,7 @@ export function BookingSection({
       toast.success("Booking dibuat! Transfer & upload bukti dalam 30 menit ya.");
 
     setDone({
-      code: `TF-${created[0].id.slice(0, 4).toUpperCase()}`,
+      code: `BF-${created[0].id.slice(0, 4).toUpperCase()}`,
       summary: `${field.name} · ${dates[dateIdx].full} · ${createdHours
         .map((h) => `${pad(h)}:00`)
         .join(", ")}`,
