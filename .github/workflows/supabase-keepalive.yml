@@ -1,0 +1,29 @@
+name: Supabase Storage Keepalive
+
+# Supabase Free-tier otomatis pause project kalau gak ada aktivitas
+# API/database selama 7 hari berturut-turut. Job ini cuma "mancing"
+# 1 request ringan ke Storage API (list objects, limit 1) tiap hari
+# biar bucket `bukti-transfer` (bukti pembayaran booking) gak pernah
+# ke-pause. Kalau job ini merah, cek dashboard Supabase — kemungkinan
+# project memang lagi paused atau service_role key udah kadaluarsa.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Storage (list bucket bukti-transfer)
+        run: |
+          curl -sf -X POST \
+            "${SUPABASE_URL}/storage/v1/object/list/bukti-transfer" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"limit": 1, "prefix": ""}'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
