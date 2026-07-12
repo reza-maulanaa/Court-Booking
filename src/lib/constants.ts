@@ -3,7 +3,7 @@ export const CLOSE_HOUR = 23;
 export const MAX_DAYS_AHEAD = 30;
 
 // Pembayaran manual: batas upload bukti transfer sejak booking dibuat.
-export const PROOF_DEADLINE_MIN = 5;
+export const PROOF_DEADLINE_MIN = 10;
 // Anti-abuse: batas booking `pending` TANPA bukti yang boleh dipegang satu
 // user bersamaan — mencegah satu akun mengunci semua slot (semua jam/semua
 // lapangan) tanpa pernah bayar. Booking yang sudah ada buktinya (menunggu
