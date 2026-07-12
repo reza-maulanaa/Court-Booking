@@ -57,11 +57,18 @@ export async function POST(
       contentType: (file as File).type,
       upsert: false,
     });
-  if (uploadError)
+  if (uploadError) {
+    // Pesan ke user sengaja generik (jangan bocorkan detail storage) —
+    // detail asli dicatat di log server (mis. Vercel → Functions → Logs)
+    // buat didiagnosis. Penyebab tersering: bucket PROOF_BUCKET belum
+    // dibuat manual di dashboard Supabase (ARCHITECTURE §9) atau
+    // SUPABASE_SERVICE_ROLE_KEY di env production salah/kadaluarsa.
+    console.error("[proof upload] Supabase Storage error:", uploadError);
     return NextResponse.json(
       { error: "Gagal mengunggah bukti, coba lagi" },
       { status: 500 },
     );
+  }
 
   // proofUrl menyimpan PATH objek Supabase (bukan URL publik — bucket
   // private tidak punya itu), dialirkan lewat GET di bawah.
@@ -114,11 +121,13 @@ export async function GET(
   const { data, error } = await supabaseAdmin.storage
     .from(PROOF_BUCKET)
     .download(b.proofUrl);
-  if (error || !data)
+  if (error || !data) {
+    if (error) console.error("[proof download] Supabase Storage error:", error);
     return NextResponse.json(
       { error: "Bukti tidak ditemukan" },
       { status: 404 },
     );
+  }
 
   return new Response(data, {
     headers: {
