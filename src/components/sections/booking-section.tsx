@@ -2,10 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { SectionHeading } from "./section-heading";
 import { fmtRp } from "@/lib/format";
-import { todayWIB } from "@/lib/constants";
+import {
+  MAX_PROOF_MB,
+  PROOF_DEADLINE_MIN,
+  TRANSFER_INFO,
+  todayWIB,
+} from "@/lib/constants";
 
 type Slot = { hour: number; available: boolean };
 
@@ -23,6 +29,7 @@ const STEPS = [
   { n: 1, label: "Pilih Jadwal" },
   { n: 2, label: "Data Pemesan" },
   { n: 3, label: "Pembayaran" },
+  { n: 4, label: "Bukti Pembayaran" },
 ];
 
 const PAY_OPTIONS = [
@@ -70,6 +77,40 @@ export function BookFieldButton({
   );
 }
 
+// input file native dibungkus label bergaya tombol — pola sama dengan
+// UploadLabel di halaman "Booking Saya", cuma di-restyle ke token tf-*.
+function ProofUploadLabel({
+  uploading,
+  label,
+  onFile,
+}: {
+  uploading: boolean;
+  label: string;
+  onFile: (f: File | undefined) => void;
+}) {
+  return (
+    <label
+      className={`inline-flex w-fit items-center justify-center rounded-[10px] px-6 py-3 text-sm font-bold text-white transition-all duration-200 ${
+        uploading
+          ? "cursor-not-allowed bg-tf-disabled"
+          : "cursor-pointer bg-tf-green hover:-translate-y-0.5 hover:bg-tf-green-deep hover:shadow-lg hover:shadow-tf-green/30 active:translate-y-0 active:scale-95"
+      }`}
+    >
+      {uploading ? "Mengunggah..." : label}
+      <input
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        disabled={uploading}
+        onChange={(e) => {
+          onFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+    </label>
+  );
+}
+
 const pad = (h: number) => String(h).padStart(2, "0");
 
 // 7 hari ke depan (basis WIB, sinkron dengan validator backend)
@@ -112,9 +153,13 @@ export function BookingSection({
   const [notes, setNotes] = useState("");
   const [pay, setPay] = useState<(typeof PAY_OPTIONS)[number]["id"]>("qris");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState<{ code: string; summary: string } | null>(
-    null,
-  );
+  const [done, setDone] = useState<{
+    code: string;
+    summary: string;
+    ids: string[];
+  } | null>(null);
+  const [proofUploading, setProofUploading] = useState(false);
+  const [proofDone, setProofDone] = useState(false);
   // Penanda refetch manual (setelah 409 / booking sukses) — slot juga
   // otomatis dimuat ulang saat lapangan/tanggal berganti.
   const [slotsVersion, setSlotsVersion] = useState(0);
@@ -208,7 +253,40 @@ export function BookingSection({
     setNotes("");
     setPay("qris");
     setDone(null);
+    setProofUploading(false);
+    setProofDone(false);
     refreshSlots();
+  }
+
+  async function uploadProof(file: File | undefined) {
+    if (!file || !done) return;
+    if (file.size > MAX_PROOF_MB * 1024 * 1024) {
+      toast.error(`Ukuran maksimal ${MAX_PROOF_MB}MB — kirim screenshot saja.`);
+      return;
+    }
+    setProofUploading(true);
+    let anyOk = false;
+    let lastError: string | null = null;
+    // Jam yang dipilih bisa loncat → beberapa booking terpisah dibuat
+    // sekaligus (lihat confirmBooking). Bukti yang sama dikirim ke semuanya.
+    for (const id of done.ids) {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/bookings/${id}/proof`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) anyOk = true;
+      else lastError = data?.error ?? "Upload gagal, coba lagi.";
+    }
+    setProofUploading(false);
+    if (anyOk) {
+      setProofDone(true);
+      toast.success("Bukti terkirim! Menunggu verifikasi admin.");
+    } else {
+      toast.error(lastError ?? "Upload gagal, coba lagi.");
+    }
   }
 
   async function confirmBooking() {
@@ -280,7 +358,9 @@ export function BookingSection({
       summary: `${field.name} · ${dates[dateIdx].full} · ${createdHours
         .map((h) => `${pad(h)}:00`)
         .join(", ")}`,
+      ids: created.map((c) => c.id),
     });
+    setStep(4);
   }
 
   return (
@@ -575,7 +655,7 @@ export function BookingSection({
           </>
         )}
 
-        {step === 3 && !done && (
+        {step === 3 && (
           <div className="grid gap-7 md:grid-cols-[1.1fr_1fr]">
             <div>
               <div className="mb-3 text-[15px] font-bold text-tf-ink">
@@ -669,32 +749,101 @@ export function BookingSection({
           </div>
         )}
 
-        {step === 3 && done && (
-          <div className="pt-7 pb-3 text-center">
-            <div className="mx-auto mb-[18px] grid size-[72px] place-items-center rounded-full border-2 border-tf-green bg-tf-pale font-barlow-condensed text-[34px] font-extrabold text-tf-green">
-              ✓
+        {step === 4 && done && (
+          <div className="pt-7 pb-3">
+            <div className="text-center">
+              <div className="mx-auto mb-[18px] grid size-[72px] place-items-center rounded-full border-2 border-tf-green bg-tf-pale font-barlow-condensed text-[34px] font-extrabold text-tf-green">
+                ✓
+              </div>
+              <div className="font-barlow-condensed text-[38px] font-extrabold italic uppercase text-tf-ink">
+                Booking Berhasil!
+              </div>
+              <div className="mt-2.5 mb-[18px] text-[15px] text-tf-muted">
+                Kode booking kamu — tunjukkan saat datang:
+              </div>
+              <div className="inline-block rounded-[10px] bg-tf-ink px-[30px] py-3 font-barlow-condensed text-[30px] font-extrabold tracking-[3px] text-tf-lime">
+                {done.code}
+              </div>
+              <div className="mt-[18px] mb-[8px] text-sm text-tf-muted">
+                {done.summary}
+              </div>
             </div>
-            <div className="font-barlow-condensed text-[38px] font-extrabold italic uppercase text-tf-ink">
-              Booking Berhasil!
+
+            <div className="mx-auto mt-8 max-w-md rounded-xl bg-tf-mist px-5 py-5 sm:px-7 sm:py-6">
+              <div className="mb-3 text-[15px] font-bold text-tf-ink">
+                4. Upload bukti pembayaran
+              </div>
+              {proofDone ? (
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <p className="text-sm text-tf-muted">
+                    Bukti terkirim ✓ — menunggu verifikasi admin.
+                  </p>
+                  <ProofUploadLabel
+                    uploading={proofUploading}
+                    label="Ganti bukti"
+                    onFile={uploadProof}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm text-tf-muted">
+                    Bayar{" "}
+                    <strong className="font-bold text-tf-ink">
+                      {fmtRp(total)}
+                    </strong>{" "}
+                    lalu upload screenshot bukti dalam{" "}
+                    <strong className="font-bold text-tf-ink">
+                      {PROOF_DEADLINE_MIN} menit
+                    </strong>{" "}
+                    — lewat dari itu booking hangus otomatis.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- aset statis, tak perlu optimasi next/image */}
+                    <img
+                      src="/qris.jpeg"
+                      alt="QRIS — scan untuk bayar"
+                      width={112}
+                      height={158}
+                      className="rounded-md border border-tf-ink/10"
+                    />
+                    <div className="grid gap-1 text-sm">
+                      <div className="font-bold text-tf-ink">Scan QRIS</div>
+                      <div className="text-tf-muted">atau transfer bank:</div>
+                      <div className="text-tf-ink">
+                        <strong className="font-bold">
+                          {TRANSFER_INFO.bank} {TRANSFER_INFO.norek}
+                        </strong>
+                        <br />
+                        a.n. {TRANSFER_INFO.atasNama}
+                      </div>
+                    </div>
+                  </div>
+                  <ProofUploadLabel
+                    uploading={proofUploading}
+                    label="Upload bukti pembayaran"
+                    onFile={uploadProof}
+                  />
+                </div>
+              )}
             </div>
-            <div className="mt-2.5 mb-[18px] text-[15px] text-tf-muted">
-              Kode booking kamu — tunjukkan saat datang:
+
+            <div className="mt-6 flex flex-col items-center gap-2 text-center">
+              <button
+                type="button"
+                onClick={resetBooking}
+                className="inline-block cursor-pointer rounded-[10px] border-[1.5px] border-tf-ink/20 px-6 py-3 text-sm font-semibold text-tf-ink transition-all duration-200 hover:-translate-y-0.5 hover:border-tf-green hover:text-tf-green active:translate-y-0 active:scale-95"
+              >
+                Buat booking lain
+              </button>
+              {!proofDone && (
+                <Link
+                  href="/bookings"
+                  className="text-xs font-semibold text-tf-muted transition-all duration-200 hover:text-tf-ink"
+                >
+                  Lewati, upload nanti di halaman Booking Saya →
+                </Link>
+              )}
             </div>
-            <div className="inline-block rounded-[10px] bg-tf-ink px-[30px] py-3 font-barlow-condensed text-[30px] font-extrabold tracking-[3px] text-tf-lime">
-              {done.code}
-            </div>
-            <div className="mt-[18px] mb-[22px] text-sm text-tf-muted">
-              {done.summary}
-              <br />
-              Konfirmasi &amp; instruksi pembayaran dikirim via WhatsApp.
-            </div>
-            <button
-              type="button"
-              onClick={resetBooking}
-              className="inline-block cursor-pointer rounded-[10px] border-[1.5px] border-tf-ink/20 px-6 py-3 text-sm font-semibold text-tf-ink transition-all duration-200 hover:-translate-y-0.5 hover:border-tf-green hover:text-tf-green active:translate-y-0 active:scale-95"
-            >
-              Buat booking lain
-            </button>
           </div>
         )}
       </div>
