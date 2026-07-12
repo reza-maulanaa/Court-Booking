@@ -43,11 +43,6 @@ const PAY_OPTIONS = [
     label: "Transfer Bank",
     desc: "BCA / Mandiri / BRI — instruksi dikirim via WhatsApp",
   },
-  {
-    id: "cash",
-    label: "Bayar di Tempat",
-    desc: "DP tidak diperlukan, bayar penuh saat datang",
-  },
 ] as const;
 
 const PICK_FIELD_EVENT = "tf:pick-field";

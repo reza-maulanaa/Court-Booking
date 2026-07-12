@@ -23,7 +23,7 @@ const FAQS = [
   },
   {
     q: "Berapa lama slot ditahan sebelum dibayar?",
-    a: `Untuk QRIS dan transfer, slot ditahan ${PROOF_DEADLINE_MIN} menit setelah booking. Untuk bayar di tempat, slot langsung terkunci dengan kode booking.`,
+    a: `Slot ditahan ${PROOF_DEADLINE_MIN} menit setelah booking, menunggu bukti pembayaran QRIS atau transfer diunggah.`,
   },
 ];
 
