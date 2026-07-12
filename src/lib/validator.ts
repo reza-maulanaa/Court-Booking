@@ -73,6 +73,49 @@ export const guestBookingSchema = z.object({
 });
 export type GuestBookingInput = z.infer<typeof guestBookingSchema>;
 
+// Close Booking (admin, walk-in cash): jam & tanggal operasional sama kayak
+// createBookingSchema, TAPI boleh jam yang SEDANG berjalan (bukan cuma jam
+// depan) — walk-in fisik udah di tempat, beda konteks dari customer online.
+// guestPhone opsional (beda dari guest checkout online): admin yang input
+// manual, kadang tamu gak mau kasih nomor.
+export const adminBookingSchema = z
+  .object({
+    fieldId: z.string().min(1),
+    bookingDate: z.iso.date(),
+    startHour: z
+      .number()
+      .int()
+      .min(OPEN_HOUR)
+      .max(CLOSE_HOUR - 1),
+    durationHours: z.number().int().min(1),
+    guestName: z.string().trim().min(1, "Nama wajib diisi").max(100),
+    guestPhone: z
+      .string()
+      .trim()
+      .optional()
+      .refine((v) => !v || /^(\+?62|0)8[0-9]{7,12}$/.test(v), {
+        message: "No. WhatsApp tidak valid (format: 08xx atau 62/+62 8xx)",
+      }),
+  })
+  .refine((b) => b.startHour + b.durationHours <= CLOSE_HOUR, {
+    message: `Booking melewati jam tutup (${CLOSE_HOUR}:00)`,
+    path: ["durationHours"],
+  })
+  .refine(
+    (b) => {
+      const today = todayWIB();
+      const max = new Date(`${b.bookingDate}T00:00:00`);
+      const limit = new Date(`${today}T00:00:00`);
+      limit.setDate(limit.getDate() + MAX_DAYS_AHEAD);
+      return b.bookingDate >= today && max <= limit;
+    },
+    {
+      message: `Tanggal harus hari ini s/d ${MAX_DAYS_AHEAD} hari ke depan`,
+      path: ["bookingDate"],
+    },
+  );
+export type AdminBookingInput = z.infer<typeof adminBookingSchema>;
+
 // FormData tidak lewat Zod — validasi file manual, dipakai route proof.
 export function proofFileError(file: unknown): string | null {
   if (!(file instanceof File) || file.size === 0)

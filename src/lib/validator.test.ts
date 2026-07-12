@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createBookingSchema, proofFileError } from "./validator";
+import { createBookingSchema, guestBookingSchema, proofFileError } from "./validator";
 
 // jam palsu semua tes: 2026-07-10 14:30 WIB = 07:30 UTC
 const NOW = new Date("2026-07-10T07:30:00Z");
@@ -57,6 +57,43 @@ describe("createBookingSchema", () => {
       startHour: 15,
     });
     expect(r.success).toBe(true);
+  });
+});
+
+describe("guestBookingSchema", () => {
+  it("menerima nama & No. WhatsApp valid (format 08xx)", () => {
+    expect(
+      guestBookingSchema.safeParse({ guestName: "Budi", guestPhone: "081234567890" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("menerima format +62/62", () => {
+    expect(
+      guestBookingSchema.safeParse({ guestName: "Budi", guestPhone: "+6281234567890" })
+        .success,
+    ).toBe(true);
+    expect(
+      guestBookingSchema.safeParse({ guestName: "Budi", guestPhone: "6281234567890" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("menolak nama kosong", () => {
+    expect(
+      guestBookingSchema.safeParse({ guestName: "  ", guestPhone: "081234567890" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("menolak nomor HP bukan format Indonesia", () => {
+    expect(
+      guestBookingSchema.safeParse({ guestName: "Budi", guestPhone: "12345" }).success,
+    ).toBe(false);
+    expect(
+      guestBookingSchema.safeParse({ guestName: "Budi", guestPhone: "0212345678" })
+        .success,
+    ).toBe(false);
   });
 });
 

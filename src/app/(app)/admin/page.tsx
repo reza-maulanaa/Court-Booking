@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateChips } from "@/components/date-chips";
 import {
@@ -21,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge, type BookingStatus } from "@/components/status-badge";
+import { CLOSE_HOUR, MAX_DAYS_AHEAD, OPEN_HOUR, todayWIB } from "@/lib/constants";
 
 type AdminBooking = {
   id: string;
@@ -30,8 +32,10 @@ type AdminBooking = {
   hargaSnapshot: number;
   proofUrl: string | null;
   status: BookingStatus;
-  userName: string;
-  userEmail: string;
+  userName: string | null;
+  userEmail: string | null;
+  guestName: string | null;
+  guestPhone: string | null;
   fieldName: string;
 };
 
@@ -59,12 +63,27 @@ const rupiah = new Intl.NumberFormat("id-ID", {
 
 const jam = (h: number) => `${String(h).padStart(2, "0")}.00`;
 
+const maxCloseDate = (() => {
+  const d = new Date(`${todayWIB()}T00:00:00`);
+  d.setDate(d.getDate() + MAX_DAYS_AHEAD);
+  return d.toLocaleDateString("en-CA");
+})();
+
 export default function AdminPage() {
   const [bookings, setBookings] = useState<AdminBooking[] | null>(null);
   const [allFields, setAllFields] = useState<Field[]>([]);
   const [date, setDate] = useState("");
   const [fieldId, setFieldId] = useState("all");
   const [busy, setBusy] = useState<string | null>(null);
+
+  const [showClose, setShowClose] = useState(false);
+  const [closeFieldId, setCloseFieldId] = useState("");
+  const [closeDate, setCloseDate] = useState(todayWIB());
+  const [closeHour, setCloseHour] = useState(OPEN_HOUR);
+  const [closeDuration, setCloseDuration] = useState(1);
+  const [closeGuestName, setCloseGuestName] = useState("");
+  const [closeGuestPhone, setCloseGuestPhone] = useState("");
+  const [closing, setClosing] = useState(false);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -88,9 +107,39 @@ export default function AdminPage() {
   useEffect(() => {
     fetch("/api/fields")
       .then((r) => r.json())
-      .then(setAllFields)
+      .then((data: Field[]) => {
+        setAllFields(data);
+        setCloseFieldId((cur) => cur || (data[0]?.id ?? ""));
+      })
       .catch(() => {});
   }, []);
+
+  async function closeBooking() {
+    setClosing(true);
+    const res = await fetch("/api/admin/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fieldId: closeFieldId,
+        bookingDate: closeDate,
+        startHour: closeHour,
+        durationHours: closeDuration,
+        guestName: closeGuestName,
+        guestPhone: closeGuestPhone,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.error ?? "Gagal close booking.");
+    } else {
+      toast.success("Booking walk-in tercatat & langsung dikonfirmasi.");
+      setCloseGuestName("");
+      setCloseGuestPhone("");
+      setShowClose(false);
+      load();
+    }
+    setClosing(false);
+  }
 
   async function transition(id: string, to: BookingStatus, label: string) {
     setBusy(id);
@@ -137,6 +186,104 @@ export default function AdminPage() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <Button variant="outline" onClick={() => setShowClose((v) => !v)}>
+          {showClose ? "Batal" : "+ Close Booking (Walk-in Cash)"}
+        </Button>
+        {showClose && (
+          <div className="mt-3 grid gap-4 rounded-2xl border p-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2">
+              <Label htmlFor="close-lapangan" className="font-bold">
+                Lapangan
+              </Label>
+              <Select value={closeFieldId} onValueChange={setCloseFieldId}>
+                <SelectTrigger id="close-lapangan" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {allFields.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="close-tanggal" className="font-bold">
+                Tanggal
+              </Label>
+              <Input
+                id="close-tanggal"
+                type="date"
+                value={closeDate}
+                min={todayWIB()}
+                max={maxCloseDate}
+                onChange={(e) => setCloseDate(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-2">
+                <Label htmlFor="close-jam" className="font-bold">
+                  Jam mulai
+                </Label>
+                <Input
+                  id="close-jam"
+                  type="number"
+                  min={OPEN_HOUR}
+                  max={CLOSE_HOUR - 1}
+                  value={closeHour}
+                  onChange={(e) => setCloseHour(Number(e.target.value))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="close-durasi" className="font-bold">
+                  Durasi (jam)
+                </Label>
+                <Input
+                  id="close-durasi"
+                  type="number"
+                  min={1}
+                  value={closeDuration}
+                  onChange={(e) => setCloseDuration(Number(e.target.value))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="close-nama" className="font-bold">
+                Nama tamu
+              </Label>
+              <Input
+                id="close-nama"
+                value={closeGuestName}
+                onChange={(e) => setCloseGuestName(e.target.value)}
+                placeholder="Nama tamu"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="close-hp" className="font-bold">
+                No. HP (opsional)
+              </Label>
+              <Input
+                id="close-hp"
+                value={closeGuestPhone}
+                onChange={(e) => setCloseGuestPhone(e.target.value)}
+                placeholder="08xx-xxxx-xxxx"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={closeBooking}
+                disabled={closing || !closeFieldId || !closeGuestName.trim()}
+                className="w-full"
+              >
+                {closing ? "Menyimpan..." : "Konfirmasi Booking Cash"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {bookings === null ? (
         <p className="text-base text-muted-foreground">Memuat...</p>
       ) : bookings.length === 0 ? (
@@ -167,10 +314,26 @@ export default function AdminPage() {
                   </TableCell>
                   <TableCell>{b.fieldName}</TableCell>
                   <TableCell>
-                    <div className="font-medium">{b.userName}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {b.userEmail}
-                    </div>
+                    {b.userName ? (
+                      <>
+                        <div className="font-medium">{b.userName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {b.userEmail}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {b.guestName}
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                            Cash
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {b.guestPhone || "—"}
+                        </div>
+                      </>
+                    )}
                   </TableCell>
                   <TableCell>
                     {rupiah.format(b.hargaSnapshot * b.durationHours)}

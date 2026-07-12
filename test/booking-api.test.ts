@@ -63,6 +63,144 @@ describe("double-booking paralel (SPEC §6)", () => {
   });
 });
 
+describe("guest checkout (tanpa login)", () => {
+  const guestBody = () =>
+    JSON.stringify({
+      fieldId,
+      bookingDate: tanggalAcak(),
+      startHour: jamAcak(),
+      durationHours: 1,
+      guestName: "Tamu Tes",
+      guestPhone: "081200000000",
+    });
+
+  it("booking tanpa cookie sesi berhasil (201), userId null", async () => {
+    const res = await fetch(`${BASE}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: guestBody(),
+    });
+    expect(res.status).toBe(201);
+    const b = await res.json();
+    expect(b.userId).toBeNull();
+    expect(b.guestName).toBe("Tamu Tes");
+
+    // ID sendiri = bukti kepemilikan: GET & cancel jalan tanpa sesi
+    const get = await fetch(`${BASE}/api/bookings/${b.id}`);
+    expect(get.status).toBe(200);
+
+    const cancel = await fetch(`${BASE}/api/bookings/${b.id}`, {
+      method: "PATCH",
+    });
+    expect(cancel.status).toBe(200);
+  });
+
+  it("tanpa guestName/guestPhone: 400", async () => {
+    const res = await fetch(`${BASE}/api/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fieldId,
+        bookingDate: tanggalAcak(),
+        startHour: jamAcak(),
+        durationHours: 1,
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("booking milik user login tidak bisa diakses tanpa sesi", async () => {
+    const res = await user("/api/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        fieldId,
+        bookingDate: tanggalAcak(),
+        startHour: jamAcak(),
+        durationHours: 1,
+      }),
+    });
+    const { id } = await res.json();
+    const anon = await fetch(`${BASE}/api/bookings/${id}`);
+    expect(anon.status).toBe(404);
+    await user(`/api/bookings/${id}`, { method: "PATCH" }); // beresin
+  });
+});
+
+describe("Close Booking (admin, walk-in cash)", () => {
+  it("admin insert langsung confirmed, userId null, muncul di list", async () => {
+    const bookingDate = tanggalAcak();
+    const startHour = jamAcak();
+    const res = await admin("/api/admin/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        fieldId,
+        bookingDate,
+        startHour,
+        durationHours: 1,
+        guestName: "Walk-in Tes",
+      }),
+    });
+    expect(res.status).toBe(201);
+    const b = await res.json();
+    expect(b.status).toBe("confirmed");
+    expect(b.userId).toBeNull();
+
+    const list = await admin(`/api/admin/bookings?date=${bookingDate}`);
+    const found = (await list.json()).find((x: { id: string }) => x.id === b.id);
+    expect(found?.guestName).toBe("Walk-in Tes");
+
+    await admin(`/api/admin/bookings/${b.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "cancelled" }),
+    }); // beresin
+  });
+
+  it("slot bentrok: 409", async () => {
+    const bookingDate = tanggalAcak();
+    const startHour = jamAcak();
+    const body = JSON.stringify({
+      fieldId,
+      bookingDate,
+      startHour,
+      durationHours: 1,
+      guestName: "Walk-in A",
+    });
+    const first = await admin("/api/admin/bookings", { method: "POST", body });
+    expect(first.status).toBe(201);
+    const second = await admin("/api/admin/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        fieldId,
+        bookingDate,
+        startHour,
+        durationHours: 1,
+        guestName: "Walk-in B",
+      }),
+    });
+    expect(second.status).toBe(409);
+
+    const { id } = await first.json();
+    await admin(`/api/admin/bookings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+  });
+
+  it("bukan admin: 403", async () => {
+    const res = await user("/api/admin/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        fieldId,
+        bookingDate: tanggalAcak(),
+        startHour: jamAcak(),
+        durationHours: 1,
+        guestName: "X",
+      }),
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("state machine transisi (SPEC §6)", () => {
   let id: string;
 

@@ -328,7 +328,90 @@ Prioritas test = tempat logika bisa salah:
 2. Kalkulasi availability (expand booking → jam terisi).
 3. Integration: dua insert overlap paralel ke DB test → tepat satu sukses,
    satu tertangkap sebagai `23P01`.
-4. Zod schemas (batas jam, durasi, tanggal).
+4. Zod schemas (batas jam, durasi, tanggal, `guestBookingSchema`).
 5. `proofFileError` (tipe file, batas ukuran, file kosong).
+6. Guest checkout: booking tanpa sesi berhasil & bisa diakses balik lewat
+   ID; booking ber-`userId` tetap 404 buat non-pemilik tanpa sesi.
+7. Close Booking: admin insert langsung `confirmed`; slot bentrok → 409;
+   bukan admin → 403.
 
 Tidak menguji framework (routing Next, Drizzle sendiri).
+
+## 11. Booking tanpa akun (guest checkout — revisi 2026-07-12)
+
+**Alasan**: banyak calon pemesan anak-anak/gaptek, tidak paham cara
+registrasi (email/password). Wajib akun jadi penghalang booking, langsung
+berdampak ke bisnis. Login tetap ada dan tetap didukung penuh — ini
+tambahan jalur, bukan pengganti.
+
+- **`src/proxy.ts`** (Next.js 16 — pengganti `middleware.ts` lama) blanket-block
+  semua request tanpa sesi ke matcher `/bookings/:path*` & `/api/bookings/:path*`
+  **sebelum** route/page manapun kesentuh. Ini gerbang pertama yang harus
+  tau soal guest checkout — kalau lupa diupdate, semua perbaikan di
+  route.ts sia-sia (request-nya gak pernah sampai ke situ sama sekali).
+  Daftar `GUEST_ACCESSIBLE` di file itu eksplisit nyebut path mana yang
+  boleh dilewati tanpa sesi: `POST /api/bookings`, `/api/bookings/[id]`
+  (+ `/proof`), dan halaman `/bookings/[id]`. `/bookings` (list) &
+  `/api/admin/*` tetap blanket-gated.
+- Schema: `bookings.userId` sekarang **nullable**; tambah `guest_name`,
+  `guest_phone` (nullable). **CHECK constraint** `bookings_owner_xor`
+  (migration `0004`) menjamin persis salah satu dari `user_id`/`guest_name`
+  yang terisi — garansi di lapisan DB, bukan cuma app (§8).
+- `POST /api/bookings`: sesi opsional. Tanpa sesi → `guestName`+
+  `guestPhone` wajib (Zod `guestBookingSchema`, `lib/validator.ts`),
+  nomor dinormalisasi (`lib/phone.ts`) sebelum disimpan.
+- **Anti-abuse tanpa akun**: `MAX_PENDING_UNPAID_BOOKINGS` yang tadinya
+  dihitung per `userId`, untuk guest dihitung per `guestPhone`
+  (dinormalisasi). Nomor bisa dipalsukan — known ceiling, upgrade path:
+  rate-limit per-IP kalau abuse guest beneran kejadian.
+- **Kepemilikan tanpa sesi**: booking dengan `userId IS NULL` bisa
+  diakses (lihat status, upload bukti, batalkan) hanya dengan tahu ID-nya
+  — ID booking adalah UUID acak, jadi "tau ID" setara "punya link
+  rahasia", pola yang sama seperti akses bukti transfer (§9). Diterapkan
+  di `GET/PATCH /api/bookings/[id]` dan `POST/GET /api/bookings/[id]/proof`.
+  Booking yang punya `userId` tetap 404 buat siapa pun tanpa sesi yang
+  cocok (atau admin) — guest tidak bisa mengintip booking user lain.
+- Halaman status publik `/bookings/[id]` (`components/booking-status.tsx`)
+  — satu-satunya kanal guest melihat hasil approve/reject, karena tidak
+  ada email/SMS. Reuse `components/booking-card.tsx` (dipecah dari
+  `bookings/page.tsx` yang login-only) supaya UI upload/cancel/status
+  identik di kedua halaman.
+- Dua jalur booking (wizard `booking-section.tsx` di landing page, form
+  `booking-form.tsx` di `/fields/[id]`) dua-duanya mendukung guest —
+  keduanya sudah mengumpulkan nama+No. WhatsApp, tinggal dikirim ke API
+  (sebelumnya dikumpulkan di form tapi tidak pernah dipakai/disimpan).
+
+### Close Booking — walk-in bayar cash (revisi 2026-07-12)
+
+Reuse infrastruktur guest checkout di atas (`userId` nullable +
+`guest_name`/`guest_phone`) buat kasus kebalikannya: pelanggan datang
+langsung, bayar cash di tempat, tanpa pernah booking online. **Alasan**:
+menghapus opsi "Bayar di Tempat" dari alur online (anti-abuse) berarti
+butuh jalan lain buat walk-in — kalau tidak, bisnis kehilangan segmen
+pelanggan itu.
+
+- `POST /api/admin/bookings` (admin-only): insert booking **langsung
+  `confirmed`** — skip `pending`/upload bukti, karena uangnya sudah di
+  tangan admin saat itu juga. `userId: null`, `guestName` wajib,
+  `guestPhone` **opsional** (beda dari guest checkout online — admin
+  yang input manual, kadang tamu tak mau kasih nomor).
+- Zod `adminBookingSchema`: jam & tanggal operasional sama kayak
+  `createBookingSchema`, TAPI **boleh jam yang sedang berjalan**
+  (tanpa refine "jam sudah lewat") — walk-in fisik sudah di tempat, beda
+  konteks dari customer online yang booking jam depan.
+- **Konflik slot**: reuse EXCLUDE constraint `bookings_no_overlap` yang
+  sama dipakai booking online — kalau slot sudah ada row aktif
+  (pending/confirmed), insert kena `23P01` → 409. **Sengaja tidak ada
+  logic "override paksa"**: kalau admin mau walk-in menang atas booking
+  online yang masih `pending`, admin cancel dulu manual booking itu
+  (`PATCH /api/admin/bookings/[id]`, sudah ada) baru Close Booking lagi.
+  Prioritas siapa menang ditentukan admin lewat urutan klik, bukan
+  logic sistem yang mutusin sepihak.
+- `GET /api/admin/bookings`: `innerJoin(users)` → **`leftJoin`** — booking
+  walk-in tidak punya baris `users`; `innerJoin` akan diam-diam
+  menghilangkan mereka dari dashboard admin. Kolom `guestName`/
+  `guestPhone` ditambahkan ke response.
+- Dashboard admin (`(app)/admin/page.tsx`): tombol "+ Close Booking"
+  membuka form inline (bukan modal/dialog — satu form sederhana, tidak
+  butuh komponen baru). Baris tabel booking walk-in ditandai badge
+  "Cash" di kolom Pemesan.

@@ -37,7 +37,9 @@ export function BookingStatus({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   async function handleUpload(file: File | undefined) {
